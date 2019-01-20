@@ -100,6 +100,10 @@ func TestImposter_MarshalJSON(t *testing.T) {
 									Timestamp: "2018-10-10T09:12:08.075Z",
 								},
 							},
+							{
+								Operator: "inject",
+								Inject:   "(request, logger) => true",
+							},
 						},
 						Responses: []mbgo.Response{
 							{
@@ -110,6 +114,12 @@ func TestImposter_MarshalJSON(t *testing.T) {
 										"Content-Type": "application/json",
 									},
 									Body: `{"test":true}`,
+								},
+							},
+							{
+								Type: "inject",
+								Value: mbgo.Inject{
+									Inject: "(request, state, logger) => {body: JSON.stringify({})}",
 								},
 							},
 						},
@@ -139,6 +149,9 @@ func TestImposter_MarshalJSON(t *testing.T) {
 									"timestamp": "2018-10-10T09:12:08.075Z",
 								},
 							},
+							map[string]interface{}{
+								"inject": "(request, logger) => true",
+							},
 						},
 						"responses": []interface{}{
 							map[string]interface{}{
@@ -149,6 +162,9 @@ func TestImposter_MarshalJSON(t *testing.T) {
 									},
 									"body": `{"test":true}`,
 								},
+							},
+							map[string]interface{}{
+								"inject": "(request, state, logger) => {body: JSON.stringify({})}",
 							},
 						},
 					},

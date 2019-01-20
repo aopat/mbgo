@@ -174,6 +174,8 @@ type Predicate struct {
 	JSONPath *JSONPath
 	// CaseSensitive determines if the match is case sensitive or not.
 	CaseSensitive bool
+	// Inject  is the injection string where Operator is "inject".
+	Inject string
 }
 
 // toDTO maps a Predicate value to a predicateDTO value.
@@ -208,6 +210,14 @@ func (p Predicate) toDTO() (predicateDTO, error) {
 
 	if p.CaseSensitive {
 		dto["caseSensitive"] = []byte("true")
+	}
+
+	if p.Inject != "" {
+		b, err := json.Marshal(p.Inject)
+		if err != nil {
+			return dto, err
+		}
+		dto["inject"] = b
 	}
 
 	return dto, nil
@@ -251,6 +261,15 @@ type HTTPResponse struct {
 	Mode string
 }
 
+// Inject is a Value for holding the injection string for a response or predicate.
+//
+// See more information about HTTP responses in mountebank at:
+// http://www.mbtest.org/docs/api/injection
+type Inject struct {
+	// Inject is the value of the inject string.
+	Inject string
+}
+
 // httpResponseDTO is the data-transfer object used to describe the
 // JSON structure of an HTTPResponse value.
 type httpResponseDTO struct {
@@ -268,6 +287,15 @@ func (r HTTPResponse) toDTO() httpResponseDTO {
 		Body:       r.Body,
 		Mode:       r.Mode,
 	}
+}
+
+// injectDTO is the data-transfer object used to describe the
+// JSON structure of an inject value in a predicate or response.
+type injectDTO string
+
+// toDTO maps a HTTPResponse value to an httpResponseDTO value.
+func (r Inject) toDTO() injectDTO {
+	return injectDTO(r.Inject)
 }
 
 // TCPResponse is a Response.Value to a matched incoming TCPRequest.
@@ -317,6 +345,10 @@ func getResponseSubTypeDTO(v interface{}) (interface{}, error) {
 		v = typ.toDTO()
 	case *HTTPResponse:
 		v = typ.toDTO()
+	case Inject:
+		v = typ.toDTO()
+	case *Inject:
+		v = typ.toDTO()
 	case TCPResponse:
 		v = typ.toDTO()
 	case *TCPResponse:
@@ -356,7 +388,7 @@ type responseDTO map[string]json.RawMessage
 // network protocol proto - currently either type HTTPResponse or TCPResponse.
 func (dto responseDTO) unmarshalProto(proto string) (resp Response, err error) {
 	if len(dto) != 1 {
-		err = errors.New("unexpected Predicate JSON structure")
+		err = errors.New("unexpected Response JSON structure")
 		return
 	}
 
@@ -365,15 +397,29 @@ func (dto responseDTO) unmarshalProto(proto string) (resp Response, err error) {
 
 		switch proto {
 		case "http":
-			r := httpResponseDTO{}
-			if err = json.Unmarshal(b, &r); err != nil {
+			switch resp.Type {
+			case "inject":
+				var r string
+				if err = json.Unmarshal(b, &r); err != nil {
+					return
+				}
+				resp.Value = Inject{
+					Inject: r,
+				}
+			case "is":
+				r := httpResponseDTO{}
+				if err = json.Unmarshal(b, &r); err != nil {
+					return
+				}
+				resp.Value = HTTPResponse{
+					StatusCode: r.StatusCode,
+					Headers:    r.Headers,
+					Body:       r.Body,
+					Mode:       r.Mode,
+				}
+			default:
+				err = fmt.Errorf("unexpected Response type: %s", resp.Type)
 				return
-			}
-			resp.Value = HTTPResponse{
-				StatusCode: r.StatusCode,
-				Headers:    r.Headers,
-				Body:       r.Body,
-				Mode:       r.Mode,
 			}
 
 		case "tcp":

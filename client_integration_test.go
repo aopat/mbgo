@@ -79,9 +79,10 @@ func TestClient_Logs(t *testing.T) {
 
 	vs, err := mb.Logs(-1, -1)
 	testutil.ExpectEqual(t, err, nil)
-	testutil.ExpectEqual(t, len(vs) >= 2, true)
+	testutil.ExpectEqual(t, len(vs) >= 3, true)
 	testutil.ExpectEqual(t, vs[0].Message, "[mb:2525] mountebank v1.16.0 now taking orders - point your browser to http://localhost:2525 for help")
-	testutil.ExpectEqual(t, vs[1].Message, "[mb:2525] GET /logs")
+	testutil.ExpectEqual(t, vs[1].Message, "[mb:2525] Running with --allowInjection set. See http://localhost:2525/docs/security for security info")
+	testutil.ExpectEqual(t, vs[2].Message, "[mb:2525] GET /logs")
 }
 
 func TestClient_Create(t *testing.T) {
@@ -152,6 +153,12 @@ func TestClient_Create(t *testing.T) {
 									Body: `{"test":true}`,
 								},
 							},
+							{
+								Type: "inject",
+								Value: mbgo.Inject{
+									Inject: "(request, state, logger) => {body: JSON.stringify({test: 'injected'})}",
+								},
+							},
 						},
 					},
 				},
@@ -198,6 +205,12 @@ func TestClient_Create(t *testing.T) {
 										"Content-Type": "application/json",
 									},
 									Body: `{"test":true}`,
+								},
+							},
+							{
+								Type: "inject",
+								Value: mbgo.Inject{
+									Inject: "(request, state, logger) => {body: JSON.stringify({test: 'injected'})}",
 								},
 							},
 						},
@@ -654,7 +667,7 @@ func createDockerContainer(ctx context.Context, cli *client.Client, image string
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: image,
-		Cmd:   []string{"mb", "--mock", "--debug"},
+		Cmd:   []string{"mb", "--mock", "--debug", "--allowInjection"},
 		ExposedPorts: nat.PortSet{
 			"2525/tcp": struct{}{},
 			"8080/tcp": struct{}{},
